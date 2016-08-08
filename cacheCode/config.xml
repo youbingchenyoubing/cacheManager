@@ -1,0 +1,11 @@
+<config>
+<blocksize>
+10
+</blocksize>
+<blocknumber>
+10
+</blocknumber>
+<path>
+/service/
+</path>
+</config>
