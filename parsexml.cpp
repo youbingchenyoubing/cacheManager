@@ -47,12 +47,15 @@ void parsexml::parseXML(const char * name,shared_ptr <configureInfo> configurefi
    	  	const char * attributeValue = node_attribute->value();
    	  	switch(atoi(attributeValue))
    	  	{
-   	  		case 1: configurefile->blockSize = atoi(block_node->value()); break;
-   	  		case 2: configurefile->maxBlockNum = atoi(block_node->value()); break;
+   	  		case 1: configurefile->blockSize = strtoul(block_node->value(),NULL,10); break;
+   	  		case 2: configurefile->maxBlockNum =strtoul(block_node->value(),NULL,10); break;
    	  		case 3: configurefile->filePath  = block_node->value();break;
    	  		case 4: configurefile->ip = block_node->value();break;
    	  		case 5: configurefile->port  = atoi(block_node->value());break;
    	  		case 6: configurefile->worker = atoi(block_node->value()); break; 
+          case 7: configurefile->diskSize = strtoul(block_node->value(),NULL,10);break;
+          case 8: configurefile->levels = block_node->value(); break;
+          case 9: configurefile->maxPiece = strtoul(block_node->value(),NULL,10);break;
    	  		default: break;
    	  	}
    	    block_node = block_node->next_sibling();

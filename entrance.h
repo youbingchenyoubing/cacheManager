@@ -1,6 +1,10 @@
 #ifndef ENTRANCE_H
 #define ENTRANCE_H
+# include "parsehash.h"
+# include "writeDisk.h"
 # include "thread.h"
+# include "bitmap.h"
+
 # include "similarlinkedhashmap.h" //管理资源
 //# include "process.h" //进程池
 //# include "thread.h"
@@ -11,29 +15,13 @@
 # include "protocol.h"
 # include "epoll_thread.h"
 # include <string.h>
+# include <string>
 # define  MAX_FD 65536
 # define  MAX_EVENT_NUMBER 10000
-
-
-//# include "epoll.h"
-//# include <iostream>
-
-//# include <queue>
-/*
-# include <stdio.h>
-# include <stdlib.h>
-# include <unistd.h>
-# include <errno.h>
-# include <sys/types.h>
-# include <sys/socket.h>
-# include <netinet/in.h>
-# include <string.h>
-# include <sys/epoll.h>
-*/
-// 存储用户传过来的信息
+using namespace cachemanager;
 struct ClientRequest
 {
-	char *fileName;  //文件名
+	char * fileName;  //文件名
 
 	unsigned int offset; // 偏移量
 
@@ -45,9 +33,9 @@ struct ClientRequest
 
 	//void  *data;    //  如果是读事件就是为空
 
-	char * type;   //表明用户是读、写事件
+	char *type;   //表明用户是读、写事件
 
-  char * flag;   //如果是为真的，即使缓存没有也要立即从磁盘上读IO
+  //char * flag;   //如果是为真的，即使缓存没有也要立即从磁盘上读IO
 	//char  *ip; // 客户端的ip地址
 
 	//unsigned short int port; //客户端的端口号
@@ -59,9 +47,12 @@ struct ClientRequest
 	}
 
 };
+// 配置文件类
 static ConfigureManager * configureInstance = NULL;
 //static UserManager * userInstance = NULL;
 static CacheManager * cacheInstance = NULL;
+static DiskManager * diskInstance  = NULL;
+static shared_ptr<configureInfo> configure = NULL;
 //static MemoryManager * memoryInstance = NULL;
 //static IOManager * ioInstance = NULL;
 /*用于处理客户的请求类*/
@@ -86,7 +77,7 @@ static CacheManager * cacheInstance = NULL;
     static int m_user_count;//统计用户数量
    private:
    	  static const int BUFFER_SIZE = 1024;  //缓存区的大小
-      static const int W_DATA = 1024;
+      static const int W_DATA = 1024;   //存储客户写数据的大小
 
       char m_write[W_DATA];  // 写文件块
    	  sockaddr_in m_address;
@@ -101,11 +92,11 @@ static CacheManager * cacheInstance = NULL;
        void printftest();//打印解析后文件，仅仅测试使用
        bool ParseRequest();
        void ResponesClient(unsigned int code, void *data = NULL);
-
+       void writeDisk(); //处理客户端的写事件
        void readCache(); //处理客户端的读事件
        bool checkRequest(); //检查客户端请求是否合理
        
-       void writevClient(void * data,const unsigned int &blockSize,const unsigned int &offset,const unsigned int  &len,const int & index );
+       void writevClient(void * data,const unsigned int &blockSize,const unsigned int &offset,const unsigned int  &len,const int & index);
 
        struct iovec m_iv[2]; //成功请求的时候，将采用writev来执行操作。
        

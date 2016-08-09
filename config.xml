@@ -1,12 +1,11 @@
 <config>
-<blocksize  type='1'>
-2048
+<blocksize>
+10
 </blocksize>
-<blocknumber type='2'>
-40
+<blocknumber>
+10
 </blocknumber>
-<path type='3'>/service/</path>
-<ip type='4'>115.28.70.190</ip>
-<worker type='6'>10</worker>
+<path>
+/service/
+</path>
 </config>
-

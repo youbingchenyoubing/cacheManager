@@ -117,7 +117,7 @@ void * ThreadManager<T>::worker(void *arg)
 template <typename T>
 void ThreadManager<T>::run()
 {
-	while( !m_stop)
+	while(!m_stop)
 	{
 		m_queuestat.wait();  // 信号量一定要在锁前面
 		m_queuelocker.lock();
@@ -135,6 +135,7 @@ void ThreadManager<T>::run()
 		}
 
 		request->process();
+
 
 	}//end while
 

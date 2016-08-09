@@ -34,7 +34,7 @@ struct LinkListNode
 	int length;
 
 	unsigned int offset;
-	LinkListNode(char *fileName,int index,size_t size)
+	LinkListNode(string fileName,int index,size_t size)
 	{
         name = fileName;
         offset = index;
@@ -109,7 +109,7 @@ struct configureInfo
 	unsigned int  maxBlockNum;// 最大申请规定大小的内存块
 
 	
-
+    size_t  diskSize; //磁盘分块大小
 	string filePath; //提供服务的路径，文件都会在 这个路径进行查找
 
 	unsigned short int port; // 默认的端口是1234
@@ -117,6 +117,11 @@ struct configureInfo
 
 	unsigned int worker; //监听和处理的进程个数
 
+	string levels; //制定hash文件名的规则
+
+
+	unsigned int maxPiece; //最大文件分块块数，不是以上面磁盘分块为基础，而是以服务器接收的buffer为基数
+    
      configureInfo()
      {
 
@@ -174,7 +179,7 @@ class IOManager
   public:
       static IOManager * getInstance();
       ~IOManager(){};
-      bool AIORead(char * fileName,int index,shared_ptr <configureInfo> configureInfo,unsigned  int & g_Info,LinkListNode * guardNode,bool flag);
+      bool AIORead(const char * fileName,int index,shared_ptr <configureInfo> configureInfo,unsigned  int & g_Info,LinkListNode * guardNode,bool flag);
   private:
   	   IOManager();
   	   //void IOMmap();
@@ -210,7 +215,7 @@ class CacheManager
 		linkListHead = linkListTail = NULL;
 		//linkListHead = linkListTail = NULL;
 	}
-	void * searchBlock(char *fileName,int block,unsigned int &g_Info); //查询数据块是否在内存,查询到直接发送过去 ，并改变队列的位置
+	void * searchBlock(const char *fileName,int block,unsigned int &g_Info); //查询数据块是否在内存,查询到直接发送过去 ，并改变队列的位置
   private:
 	CacheManager(ConfigureManager * configureInstance); //构造函数，初始化参数
 
@@ -226,9 +231,9 @@ class CacheManager
 	bool linkListInsertHead(LinkListNode *nodeInfo); // 将特定的节点插入到链表的首部
 
 	bool linkListDisplaceNode(LinkListNode *nodeInfo); //替换节点到首部 节点 ，命中的时候，才会调用这个函数
-    void * getIoBlock(char * fileName,int index,unsigned int & g_info); //说明cache块数还没达到系统设定的要求
+    void * getIoBlock(const char * fileName,int index,unsigned int & g_info); //说明cache块数还没达到系统设定的要求
 
-	void * getIoBlock2(char * fileName,int index,unsigned int &g_info); // 系统的cache块数已经达到最大要求，要采用LRU算法替换
+	void * getIoBlock2(const char * fileName,int index,unsigned int &g_info); // 系统的cache块数已经达到最大要求，要采用LRU算法替换
     unsigned int curBlockNum; // 现在链表中的内存块数量，初始化应该设置为0。
    
 	LinkListNode * linkListHead; // 链表头部指针，初始化设为NULL；
@@ -241,40 +246,15 @@ class CacheManager
 	//map<char *,map<unsigned   int,unsigned int>> missCache; //记录 具体 某一块缺失的次数
 	//map<char *, map<unsigned int,LinkListNode *> > mapManager;  //这个结构是核心，为了快速定位到链表中的某个节点
      map<string,map<unsigned int,LinkListNode*>> mapManager;
-    rwlocker m_maplocker;
+     rwlocker m_maplocker;
 
-    static IOManager * ioInstance;
+     static IOManager * ioInstance;
 
     
 	 //static shared_ptr <CacheManager>  cacheInstance(new CacheManager); //为了实现单例模式
     shared_ptr <configureInfo > configureContent;
     LinkListNode * guardNode;
-    /*防止内存泄漏*/ 
-    /*
-    class GC
-    {
-      public:
-      	~GC()
-      	{
-      		mapManager.clear();
-      		LinkListNode * node = linkListHead;
-      		if(node)
-      		{
-      			LinkListNode * temp = node->post;
-      			delete node;
-      			node = temp;
-      		}
-      		node = guardNode;
-      		if(node)
-      		{
-               delete node;
-      		}
-      		linkListHead = linkListTail = NULL;
-      		guardNode = NULL;
-      	}
-    }; //end GC
 
-    static GC  gc;*/
  };
 class LogManager
 {

@@ -12,5 +12,8 @@
 #define ERRORREAD   700  //读取文件错误
 #define MALLOCERROR 800  // 动态空间分配错误
 #define AIOERROR    900  //异步读错误
-#define INFOCLIENT  103 // 用户告知用户开辟多少空间来接收数据
+#define HASHERROR   901  //hash文件有错误
+//#define INFOCLIENT  103 // 用户告知用户开辟多少空间来接收数据
+#define ERRORALIGN  301    //写协议未按服务端的buffer对齐
+#define ERRORSIZE   302  //写文件太大
 #endif

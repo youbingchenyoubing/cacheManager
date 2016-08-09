@@ -31,7 +31,7 @@ void CacheConn::init()
 
    memset(m_buf,'\0',BUFFER_SIZE);
    memset(m_write,'\0',W_DATA);
-   memset(m_iv,'NULL',sizeof(m_iv));
+   memset(m_iv,0,sizeof(m_iv));
    m_read_idx = 0;
    m_write_idx = 0;
 
@@ -39,6 +39,7 @@ void CacheConn::init()
 /*线程入口处理函数*/
 void  CacheConn::process()
 {
+  /*其实这边代码要重构可以改为命令模式*/
      if (strcmp(clientData->type,"read")==0)
      {
           //读事件
@@ -47,11 +48,15 @@ void  CacheConn::process()
 
      }
 
-     else 
+     else if(strcmp(clientData->type,"write")==0)
     {
          //写事件
+        writeDisk();
     }
-
+     else
+     {
+        //其他事件
+     }
     init();
 
 }
@@ -105,29 +110,37 @@ bool CacheConn::read()
               #ifdef __CACHE_DEBUG
                cout<<"客户是发送过来读事件"<<endl;
               #endif
-                return  true;
+              if(clientData->len<=0)
+              {
+                #ifdef __CACHE_DEBUG
+               cout<<"客户读取的数据小于0,拒绝"<<endl;
+              #endif
+               return false;
+              }
+              modfd(m_epollfd,m_sockfd,EPOLLOUT); /*为了防止上一个请求还没处理，客户端发来另外一个请求*/
+              return  true;
             }
-          else
+          else 
           {
             #ifdef __CACHE_DEBUG
             cout<<"客户端发送过来的是写事件"<<endl;
             #endif
+             if(clientData->len<=0)
+              {
+                #ifdef __CACHE_DEBUG
+               cout<<"客户发送数据小于0,拒绝"<<endl;
+               #endif
+               return false;
+              }
             int i = 0;
             for(++idx;idx<m_read_idx;++idx,++i)
                  m_write[i]  = m_buf[idx];
-
-            ret = recv(m_sockfd,m_write+i,clientData->len-i,0);
-
-            if (ret <=0)
-            {
-
-              ResponesClient(ERRORBODY,NULL);
-              return false;
-            } //end if(ret<=0)
-            else  //真正写事件
-            {
-               return true;
-            }
+             
+             m_write_idx = i; //防止把写命令中的数据读出来
+            //ret = recv(m_sockfd,m_write+i,clientData->len-i,0);
+           modfd(m_epollfd,m_sockfd,EPOLLOUT);/*这样做虽然降低并发性，但是不会出现bug*/
+           return true;
+          
                 
           }// end else
        }//end  if(ParseRequest())
@@ -143,13 +156,110 @@ bool CacheConn::read()
    }// end while(true)
    
 }
+// 处理客户端写的请求
+void CacheConn::writeDisk()
+{
+  unsigned int idx = 0;
+  int ret = 0;
+  /*对每次用户发过来的数据不确定，将
+  长度切分成服务器接收buffer的几倍*/
+  int times = (clientData->len)/W_DATA;
+
+  if(times*W_DATA<clientData->len) /*处理不能整除的问题*/
+      times+=1;
+  string file;
+  string hashFile = clientData->fileName;
+  if(!parseHash(configure->levels,file,hashFile))
+  {
+     ResponesClient(HASHERROR,NULL); //hash文件解析错误
+     modfd(m_epollfd,m_sockfd,EPOLLIN);
+     return;
+  }
+  /*检查磁盘数据是否与服务器对齐*/
+  if((clientData->offset)%W_DATA)
+  {
+     ResponesClient(ERRORALIGN,NULL);
+     modfd(m_epollfd,m_sockfd,EPOLLIN);
+     return;
+  }
+  unsigned int startBlock = (clientData->offset)/W_DATA;
+  string fileHash=file+".bitmap";
+  BitMap tempMap(fileHash.c_str(),configure->maxPiece);
+  unsigned int code = 0;
+  bool bitMapChanged= false; //标志位图 信息是否发生改变
+  for(int i = 0;i<times;++i)
+  {
+     
+     while(true)
+     {
+        idx = m_write_idx;
+        ret = recv(m_sockfd,m_write+idx,W_DATA-idx,0);
+        if(ret<= 0)
+        {
+        if (errno == EAGAIN||errno == EWOULDBLOCK)
+         {
+          ResponesClient(ERRORDATA,NULL);
+          goto end;
+         }
+          goto end;
+        }
+        else{
+          m_write_idx+=ret;
+          #ifdef __CACHE_DEBUG
+          cout<<"这次写文件的内容是："<<m_write<<endl;
+          #endif 
+         
+          if(i!=times-1 && m_write_idx == W_DATA)
+                  break;
+          else if(i==times-1 && ((clientData->len)-i*W_DATA)== m_write_idx)
+                  break;
+
+        }
+       
+
+    
+     }//end while(true)
+     //在这里添加写磁盘的代码
+      
+     int temp = tempMap.getByteValue(startBlock+i);
+     if(temp == 0)
+     {
+    
+         if(!(diskInstance->writeOneBuff(file,m_write,((clientData->offset)+i*W_DATA),m_write_idx)))
+         {
+           #ifdef __CACHE_DEBUG
+           cout<<"在写第"<<i+1<<"块出错了,错误代码是"<<code<<endl;
+           #endif 
+            ResponesClient(code,NULL);
+           goto  end;
+         }
+         //改变位图
+         tempMap.setByteValue(startBlock+i,1);
+     }
+     else if(temp == -1)
+     {
+        ResponesClient(ERRORSIZE,NULL);
+        goto end;
+     }
+      m_write_idx = 0;
+      memset(m_write,'\0',W_DATA);
+
+  }  
+ end:
+  modfd(m_epollfd,m_sockfd,EPOLLIN);
+  if(bitMapChanged) //位图信息变化,更新到磁盘
+  {
+    tempMap.restoreBitMap(fileHash.c_str());
+  }
+}
 //处理客户端读的请求
 void CacheConn::readCache()
 {
-   modfd(m_epollfd,m_sockfd,EPOLLOUT);
+   
    unsigned int blockSize = configureInstance->readConfigure()->blockSize;
    unsigned int beginBlock =  (clientData->offset)/blockSize;
    unsigned int endBlock = (clientData->offset+clientData->len)/blockSize;
+   /*下面这句话应该去掉*/
    if((endBlock-beginBlock+1)*blockSize<(clientData->len))
          endBlock+=1;
    #ifdef __CACHE_DEBUG
@@ -219,44 +329,7 @@ void CacheConn::writevClient(void * data,const unsigned int &blockSize,const uns
 
   m_iv[1].iov_base = data+begin_offset;
   m_iv[1].iov_len = send_count;
-    /*先发送一些数据告诉客户到底要开多大的缓存区来接收服务端的数据*/
-  ret = snprintf(ivInfo,20,"%d/%zd/%zd\r\n",INFOCLIENT,m_iv[0].iov_len,m_iv[1].iov_len);
-    if(ret>20) 
-  {
-      #ifdef __CACHE_DEBUG
-      cout<<"头部协议过长"<<endl;
-      #endif
-    return ;
-  }
-  while(1)
-  {
-   ret  = send(m_sockfd,ivInfo,strlen(ivInfo),0);
-     if(ret<=-1)
-      {
-          if(errno ==ENOBUFS|| errno== ENOMEM||errno==EAGAIN)
-          {
-            #ifdef __CACHE_DEBUG
-           cout<<"WARNING!!!Send的TCP写缓冲空间不足"<<endl;
-
-           #endif
-            continue;
-          }
-          #ifdef __CACHE_DEBUG
-          cout<<"ERROR!!!服务端出现大错误,错误代码:"<<errno<<endl;
-          #endif
-          break;
-
-      }
-      else if(ret == strlen(ivInfo)){
-                  break;
-      }
-      else {
-          #ifdef __CACHE_DEBUG
-          cout<<"WARNING!!!服务端发送的数据不一致,本应该发送"<<strlen(ivInfo)<<"个字节，却发送了"<<ret<<"个字节"<<endl;
-          #endif
-          break;
-      }
-  }
+  
   while(1)
   {
     ret = writev(m_sockfd,m_iv,2);
@@ -323,9 +396,9 @@ bool CacheConn::ParseRequest()
         {
           case 0: clientData->type = buf;break;
           case 1: clientData->fileName = buf;break;
-          case 2: clientData->offset = atoi(buf);break;
-          case 3: clientData->len = atoi(buf); break;
-          case 4: clientData->flag = buf;break;
+          case 2: clientData->offset =strtoul(buf,NULL,10);break;
+          case 3: clientData->len = strtoul(buf,NULL,10); break;
+          //case 4: clientData->flag = buf;break;
           default:break;
         }
         isbegin = false;
@@ -423,13 +496,16 @@ void CacheConn::close_conn()
 }
 Entrance::Entrance()
 {
-	fileName = "config.xml";
+	  fileName = "config.xml";
 
     configureInstance = CacheFactory::createConfigureManager();
 
     //userInstance = CacheFactory::createUserManger();
 
     cacheInstance =  CacheFactory::createCacheManager(configureInstance);
+
+    configure = configureInstance->readConfigure();
+    diskInstance = DiskManager::getInstance(configure->diskSize);
 
     //memoryInstance  = CacheFactory::createMemoryManager();
 
@@ -654,7 +730,7 @@ void Entrance::openTCP_Thread(shared_ptr <configureInfo> configurefile)
            //信号处理
          else if((sockfd == sig_pipefd[0])&&(events[i].events & EPOLLIN))
          {
-              int sig;
+              //int sig;
               char signals[1024];
 
               ret  = recv(sig_pipefd[0],signals,sizeof(signals),0);

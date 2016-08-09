@@ -1,4 +1,4 @@
-#include"similarlinkedhashmap.h"
+#include "similarlinkedhashmap.h"
 
 /* Cache工厂类*/
 // 创建cache管理实例
@@ -48,17 +48,7 @@ MemoryManager::MemoryManager()
 	//cachePool = NULL;
 	//classPool = ngx_create_pool(4096,NULL);
 }
-/*
-MemoryManager::~MemoryManager()
-{
-	
-   ~Manager();
-}*/
-//  打印内存池的内容
-//MemoryManager::printfPool()
-//{
-	
-//}
+
 
  MemoryManager* MemoryManager:: getInstance()
 {
@@ -66,23 +56,6 @@ MemoryManager::~MemoryManager()
 	return & memoryInstance;
 }
 
-/*ngx_pool_t * MemoryManager::getClassPool()
-{
-	return classPool;
-}*/
-/*ngx_pool_t * MemoryManager::getCachePool()
-{
-	return cachePool;
-}*/
-/*void  MemoryManager::buildCachePool(configureInfo *configureFile)
-{
-	if(configureFile == NULL)
-		 exit(1);
-
-	cachePool =  ngx_create_cache_pool(((configureFile->maxBlockNum)/2)*(configureFile->blockSize),NULL); //这个目前暂时预定，到时候测试在修改
-}*/
-/*实现 cache管理类*/
-/*CacheManager::GC CacheManager::gc;*/
 IOManager* CacheManager::ioInstance = CacheFactory::createIOManager();
  CacheManager * CacheManager:: getInstance(ConfigureManager * configureInstance)
 {
@@ -115,7 +88,7 @@ CacheManager::~CacheManager()
 {
   ~Manager();
 }*/
-void * CacheManager::searchBlock(char * fileName,int index,unsigned int & g_Info)
+void * CacheManager::searchBlock(const char * fileName,int index,unsigned int & g_Info)
 {
 
     #ifdef __CACHE_DEBUG
@@ -123,22 +96,6 @@ void * CacheManager::searchBlock(char * fileName,int index,unsigned int & g_Info
       #endif
    string file = fileName;
    m_maplocker.rdlock();
-   /*   
-   if(mapManager.empty()) 
-   {
-      m_maplocker.unlock();
-      return getIoBlock();
-   }*/
-    /*
-    map<string, map<unsigned int,LinkListNode *> > ::iterator it33 = mapManager.begin();
-    for(;it33!=mapManager.end();++it33)
-    {
-         cout<<"it->first="<<it33->first<<endl;
-        map<unsigned int,LinkListNode *> temp = it33->second;
-         map<unsigned int,LinkListNode *>::iterator it44 = temp.begin();
-         for(;it44!=temp.end();++it44)
-          cout<<"it44->index="<<it44->first<<endl;
-    }*/
    map<string, map<unsigned int,LinkListNode *> > ::iterator it = mapManager.find(file);
    if(it == mapManager.end())
    {
@@ -196,14 +153,14 @@ void * CacheManager::searchBlock(char * fileName,int index,unsigned int & g_Info
    } //end else{}
 
 }
-void * CacheManager::getIoBlock(char * fileName,int index,unsigned int & g_Info)
+void * CacheManager::getIoBlock(const char * fileName,int index,unsigned int & g_Info)
 {
     #ifdef __CACHE_DEBUG
     cout<<"开启IO读取模式"<<endl;
     #endif
     string file = fileName;
    
-    LinkListNode * temp = new LinkListNode(fileName,index,configureContent->blockSize);
+    LinkListNode * temp = new LinkListNode(file,index,configureContent->blockSize);
    
     if(!(ioInstance->AIORead(fileName,index,configureContent,g_Info,temp,false)))
     {
@@ -245,7 +202,7 @@ void * CacheManager::getIoBlock(char * fileName,int index,unsigned int & g_Info)
 
 
 }
-void * CacheManager::getIoBlock2(char * fileName,int index,unsigned int & g_Info)
+void * CacheManager::getIoBlock2(const char * fileName,int index,unsigned int & g_Info)
 {
 
    #ifdef __CACHE_DEBUG
@@ -491,6 +448,12 @@ void ConfigureManager::printfConfigure()
      cout<<"configureFile->ip="<<configureFile->ip<<endl;
 
      cout<<"configureFile->worker="<<configureFile->worker<<endl;
+
+     cout<<"configureFile->levels="<<configureFile->levels<<endl;
+
+     cout<<"configureFile->diskSize="<<configureFile->diskSize<<endl;
+     cout<<"configureFile->maxPiece="<<configureFile->maxPiece<<endl;
+
    }
 }
 // 
@@ -586,7 +549,7 @@ IOManager * IOManager::getInstance()
 }
 
 
-bool IOManager::AIORead(char *fileName,int index,shared_ptr <configureInfo> configureContent,unsigned  int & g_Info,LinkListNode * guardNode,bool flag)
+bool IOManager::AIORead(const char *fileName,int index,shared_ptr <configureInfo> configureContent,unsigned  int & g_Info,LinkListNode * guardNode,bool flag)
 {
    int fd,ret = -1;
 
