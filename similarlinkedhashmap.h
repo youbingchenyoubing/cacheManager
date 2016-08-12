@@ -155,7 +155,7 @@ private:
 	 // 替换成内存池操作
 	
 };
-
+/*
 // 用户管理器  没用
 class UserManager
 {
@@ -171,7 +171,7 @@ class UserManager
 	 queue<userInfo * > postUserInfo;   //用队列存储用户请求事件
 	 //queue<userInfo *>
 
-};
+};*/
 // io管理器
 class IOManager
 {
@@ -261,6 +261,7 @@ class LogManager
 	public:
 
 };
+/*
 // 内存 池 的实现 （利用Nginx实现）
 class MemoryManager
 {
@@ -278,7 +279,7 @@ class MemoryManager
 	// static shared_ptr <MemoryManager> memoryInstance(new MemoryManager; // 唯一用new实现
   
 };
-
+*/
 
 
 
@@ -288,10 +289,10 @@ class CacheFactory
 public:
 	 static CacheManager * createCacheManager(ConfigureManager * configureInstance);
 	 static ConfigureManager * createConfigureManager();
-	 static UserManager * createUserManger();
-	 static MemoryManager * createMemoryManager();
+	 //static UserManager * createUserManger();
+	 //static MemoryManager * createMemoryManager();
 	 static IOManager * createIOManager();
-	 static LogManager * createLogManager();
+	 //static LogManager * createLogManager();
 	// template  <typename T>
 	 //static ProcessManager <T>* createProcessManager(int listenfd, unsigned int processNumber);
 };

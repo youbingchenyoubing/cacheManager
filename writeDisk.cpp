@@ -8,13 +8,14 @@ DiskManager* DiskManager::getInstance(const size_t &ds)
 	return &m_instance;
 }
 
-bool DiskManager::writeOneBuff(const string & hashName,const char buff[],const unsigned int &offset,int &length)
+bool DiskManager::writeOneBuff(const string & hashName,const char buff[],const unsigned int &offset,unsigned int &length)
 {
    /*磁盘块单位为MB为单位*/
- 
-   unsigned int beginBlock = offset/diskSize;
-
-   unsigned long int newoffset =  offset%(diskSize);
+  
+    unsigned int beginBlock = offset/diskSize;
+   //cout<<beginBlock<<endl;
+  
+   unsigned int newoffset =  offset%(diskSize);
 
    unsigned int endBlock = (offset+length)/diskSize;
 
@@ -23,7 +24,8 @@ bool DiskManager::writeOneBuff(const string & hashName,const char buff[],const u
    char *str  = new char[filelength+10];
    //char str2[10]; 
    //strcpy(str,hashName.c_str());
-   
+    unsigned int len1;
+   /*
    if(beginBlock == endBlock)
    {
    	 snprintf(str,filelength+10,"%s.t%zd",hashName.c_str(),beginBlock);
@@ -42,31 +44,54 @@ bool DiskManager::writeOneBuff(const string & hashName,const char buff[],const u
 
         freeNew(str);
      		return false;
-     }
-    }
-   else if(endBlock ==(beginBlock+1))
-   {
-   	  int len1 = diskSize-newoffset;
-   	//unsigned  int len2 = length;
+     }*/
+    
    	//unsigned  int len2 = length -len1;
-   	for(int i=beginBlock;i<=endBlock;++i)
+   	for(unsigned int i=beginBlock;i<=endBlock;++i)
    	{
-    memset(str,'\0',filelength+10);
-   	snprintf(str,filelength+10,"%s.t%zd",hashName.c_str(),i);
-    int fd = open(str, O_RDWR|O_CREAT|O_WRONLY,0666);
-    lseek(fd, diskSize- 1, SEEK_SET);
-    lseek(fd,newoffset,SEEK_SET);
 
-    if(write(fd,buff,len1)==len1)
+
+    len1 = (diskSize-newoffset<length ? diskSize-newoffset:length);
+    memset(str,'\0',filelength+10);
+   	snprintf(str,filelength+10,"%s.t%u",hashName.c_str(),i);
+    // 多进程写文件这边要 加锁吗？这个等以后再考虑
+    if(access(str,F_OK)==-1)
+    {
+        /*这个文件不存在*/
+        FILE *tempfp  = fopen(str,"a");
+        if(tempfp == NULL)
+          {
+              #ifdef __CACHE_DEBUG
+             cout<<"ERROR!!!创建位图文件失败"<<endl;
+             #endif
+             return false;
+          }
+          fclose(tempfp);
+          //isFirst = true;
+        
+    }
+    FILE *fp = fopen(str, "rb+"); //二进制写文件
+    if(fp==NULL)
+    {
+      //因为上面建文件的时候，没有加锁，对于多线程很可能会有问题，不过这个小概率事件。
+      #ifdef __CACHE_DEBUG
+      cout<<"errno="<<errno<<endl;
+      #endif
+      freeNew(str);
+      return false;
+    }
+    fseek(fp,diskSize- 1, SEEK_SET);
+    fseek(fp,newoffset,SEEK_SET);
+
+    if(fwrite(buff,sizeof(char),len1,fp)==len1)
      {
-     	close(fd);
+     	fclose(fp);
      	newoffset = 0;
-     	len1 = length-len1;
-     	length -=len1;
+      length -=len1;
      }
     else
     {
-    	 close(fd);
+    	  fclose(fp);
         freeNew(str);
         return false;
     }
@@ -82,15 +107,7 @@ bool DiskManager::writeOneBuff(const string & hashName,const char buff[],const u
           #endif
           return false;
    }
-} // end else if(endBlock ==(beginBlock+1))
-   else
-   {
-   	      #ifdef __CACHE_DEBUG
-          cout<<"ERROR!!!写文件出现了错误"<<endl;
-          #endif
-         freeNew(str);
-         return false;
-   }
+
   
 }
 

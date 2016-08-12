@@ -92,9 +92,11 @@ bool CacheConn::read()
      else
      {
         m_read_idx+=ret;
+        /*
         #ifdef __CACHE_DEBUG
         cout<<"user send content is "<<m_buf<<endl;
         #endif
+        */
       for(; idx < m_read_idx;++idx)
       {
          if((idx>=1)&&(m_buf[idx-1] == '\r')&&(m_buf[idx]=='\n'))
@@ -132,6 +134,16 @@ bool CacheConn::read()
                #endif
                return false;
               }
+               /*检查磁盘数据是否与服务器对齐*/
+          if((clientData->offset)%W_DATA)
+         {
+            ResponesClient(ERRORALIGN,NULL);
+            #ifdef __CACHE_DEBUG
+            cout<<"ERROR!!!偏移量无法与服务器接收缓冲对齐"<<endl;
+            #endif
+           return false;
+           
+          }
             int i = 0;
             for(++idx;idx<m_read_idx;++idx,++i)
                  m_write[i]  = m_buf[idx];
@@ -167,24 +179,19 @@ void CacheConn::writeDisk()
 
   if(times*W_DATA<clientData->len) /*处理不能整除的问题*/
       times+=1;
-  string file;
+  string file="";
+  file+=configurefile->filePath;
   string hashFile = clientData->fileName;
-  if(!parseHash(configure->levels,file,hashFile))
+  if(!parseHash(configurefile->levels,file,hashFile))
   {
      ResponesClient(HASHERROR,NULL); //hash文件解析错误
      modfd(m_epollfd,m_sockfd,EPOLLIN);
      return;
   }
-  /*检查磁盘数据是否与服务器对齐*/
-  if((clientData->offset)%W_DATA)
-  {
-     ResponesClient(ERRORALIGN,NULL);
-     modfd(m_epollfd,m_sockfd,EPOLLIN);
-     return;
-  }
+ 
   unsigned int startBlock = (clientData->offset)/W_DATA;
   string fileHash=file+".bitmap";
-  BitMap tempMap(fileHash.c_str(),configure->maxPiece);
+  BitMap tempMap(fileHash.c_str(),configurefile->maxPiece);
   unsigned int code = 0;
   bool bitMapChanged= false; //标志位图 信息是否发生改变
   for(int i = 0;i<times;++i)
@@ -205,9 +212,11 @@ void CacheConn::writeDisk()
         }
         else{
           m_write_idx+=ret;
+          /*
           #ifdef __CACHE_DEBUG
           cout<<"这次写文件的内容是："<<m_write<<endl;
-          #endif 
+          #endif
+          */ 
          
           if(i!=times-1 && m_write_idx == W_DATA)
                   break;
@@ -220,13 +229,16 @@ void CacheConn::writeDisk()
     
      }//end while(true)
      //在这里添加写磁盘的代码
-      
+       
      int temp = tempMap.getByteValue(startBlock+i);
      if(temp == 0)
      {
-    
+           #ifdef __CACHE_DEBUG
+           cout<<"位图没有这一块"<<endl;
+           #endif
          if(!(diskInstance->writeOneBuff(file,m_write,((clientData->offset)+i*W_DATA),m_write_idx)))
          {
+           code = ERRORWRITE;
            #ifdef __CACHE_DEBUG
            cout<<"在写第"<<i+1<<"块出错了,错误代码是"<<code<<endl;
            #endif 
@@ -235,6 +247,7 @@ void CacheConn::writeDisk()
          }
          //改变位图
          tempMap.setByteValue(startBlock+i,1);
+         bitMapChanged = true;
      }
      else if(temp == -1)
      {
@@ -245,10 +258,12 @@ void CacheConn::writeDisk()
       memset(m_write,'\0',W_DATA);
 
   }  
+  ResponesClient(OKW,NULL);
  end:
   modfd(m_epollfd,m_sockfd,EPOLLIN);
   if(bitMapChanged) //位图信息变化,更新到磁盘
   {
+    
     tempMap.restoreBitMap(fileHash.c_str());
   }
 }
@@ -256,7 +271,7 @@ void CacheConn::writeDisk()
 void CacheConn::readCache()
 {
    
-   unsigned int blockSize = configureInstance->readConfigure()->blockSize;
+   unsigned int blockSize = configurefile->blockSize;
    unsigned int beginBlock =  (clientData->offset)/blockSize;
    unsigned int endBlock = (clientData->offset+clientData->len)/blockSize;
    /*下面这句话应该去掉*/
@@ -297,7 +312,6 @@ void CacheConn::writevClient(void * data,const unsigned int &blockSize,const uns
   {
        end_offset = ((index+1)*blockSize-1)-offset-len;
   }
-  cout<<"begin_offset="<<begin_offset<<",end_offset="<<end_offset<<endl;
   size_t send_count =blockSize-begin_offset-end_offset;
 
   if(send_count <=0||send_count>blockSize)
@@ -480,10 +494,10 @@ void CacheConn::close_conn()
 {
   if((m_sockfd != -1))
   {
-    removefd(m_epollfd,m_sockfd);
-    close(m_sockfd);
-    m_sockfd = -1;
-    m_user_count --;
+     removefd(m_epollfd,m_sockfd);
+    //close(m_sockfd);
+     m_sockfd = -1;
+     m_user_count --;
      #ifdef __CACHE_DEBUG
      cout<<"关闭了客户端的连接"<<endl;
      cout<<"被关闭的用户IP是:"<< inet_ntoa(m_address.sin_addr)<<"端口是:"<<m_address.sin_port<<endl;
@@ -504,8 +518,10 @@ Entrance::Entrance()
 
     cacheInstance =  CacheFactory::createCacheManager(configureInstance);
 
-    configure = configureInstance->readConfigure();
-    diskInstance = DiskManager::getInstance(configure->diskSize);
+    
+
+    //cout<<"configure->diskSize"<<configure->diskSize<<endl;
+    
 
     //memoryInstance  = CacheFactory::createMemoryManager();
 
@@ -557,19 +573,18 @@ void Entrance::parseParameters(int argc, char *const *argv)
 }
 
 //初始化这个程序
-
-bool Entrance::initProgram()
+void Entrance::initProgram()
 {    
-       #ifdef __CACHE_DEBUG
+     #ifdef __CACHE_DEBUG
      cout<<"开始初始化整个程序"<<endl;
      #endif
-     shared_ptr <configureInfo> configurefile = configureInstance->readConfigure();
+     configurefile = configureInstance->readConfigure();
      parsexml::parseXML(fileName,configurefile);
       #ifdef __CACHE_DEBUG
      cout<<"配置信息如下"<<endl;
      #endif
      configureInstance->printfConfigure();
-
+     diskInstance = DiskManager::getInstance(configurefile->diskSize);
      openTCP_Thread(configurefile);
      
 }
@@ -734,7 +749,7 @@ void Entrance::openTCP_Thread(shared_ptr <configureInfo> configurefile)
               char signals[1024];
 
               ret  = recv(sig_pipefd[0],signals,sizeof(signals),0);
-              if(recv <= 0)
+              if(ret <= 0)
               {
                  continue;
               }

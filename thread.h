@@ -24,11 +24,11 @@ class ThreadManager
 
      	int m_thread_number;
      	int m_max_requests;
+      bool m_stop;
      	pthread_t * m_pthreads;
      	std::list<T*> m_workqueue;
      	locker m_queuelocker;
      	sem m_queuestat;
-     	bool m_stop;
       static ThreadManager <T>*  m_instance;
 };
 template <typename T>

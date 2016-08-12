@@ -16,4 +16,5 @@
 //#define INFOCLIENT  103 // 用户告知用户开辟多少空间来接收数据
 #define ERRORALIGN  301    //写协议未按服务端的buffer对齐
 #define ERRORSIZE   302  //写文件太大
+#define ERRORWRITE  303  //服务器写错误
 #endif

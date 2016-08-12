@@ -14,47 +14,14 @@
 
  	 return ConfigureManager::getInstance();
  }
-// 创建用户请求管理机制 
- UserManager * CacheFactory::createUserManger()
-{
 
-	return UserManager::getInstance();
-}
-
- MemoryManager * CacheFactory::createMemoryManager()
-{
-	//还没实现 
-   return  MemoryManager::getInstance();
-}
 
  IOManager * CacheFactory::createIOManager()
 {
 
   return  IOManager::getInstance();
 }
-/*
-ProcessManager <T>* CacheFactory::createProcessManager(int listenfd, unsigned int processNumber)
-{
- 
-  return  ProcessManager::getInstance(int listenfd,unsigned int processNumber);
 
-}*/
-/*结束工厂类的实现*/
-
-/*实现内存池管理类*/
-MemoryManager::MemoryManager()
-{
-	//classPool = NULL;
-	//cachePool = NULL;
-	//classPool = ngx_create_pool(4096,NULL);
-}
-
-
- MemoryManager* MemoryManager:: getInstance()
-{
-  static MemoryManager memoryInstance;
-	return & memoryInstance;
-}
 
 IOManager* CacheManager::ioInstance = CacheFactory::createIOManager();
  CacheManager * CacheManager:: getInstance(ConfigureManager * configureInstance)
@@ -483,54 +450,7 @@ UserManager::~UserManager()
 {
     ~Manager();
 }*/
-UserManager::UserManager()
-{
-  if (!postUserInfo.empty())
-  {
-    cout<<"Warning,程序的事件不为空"<<endl;
-    //postUserInfo.clear();
-  }
-}
 
-userInfo * UserManager::readSomething()
-{
-
-     userInfo * data = NULL;
-    if( !postUserInfo.empty())
-    {
-        data = postUserInfo.front();
-
-        postUserInfo.pop();
-    }
-
-    return data;
-}
-
-
-bool UserManager::writeSomething(userInfo *userdata)
-{
-   if (userdata != NULL)
-   {
-
-       postUserInfo.push(userdata);
-
-       return true;
-   }
-
-    return false;
-}
-
-void UserManager::caculateInfo(userInfo *userdata,configureInfo *configureFile)
-{
-  //待会实现
-}
-
- UserManager* UserManager::getInstance()
-{
-    static UserManager userInstance;
-
-    return &userInstance;
-}
 //结束用户管理类的配置
 
 //开始实现IO类

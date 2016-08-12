@@ -52,9 +52,10 @@ static ConfigureManager * configureInstance = NULL;
 //static UserManager * userInstance = NULL;
 static CacheManager * cacheInstance = NULL;
 static DiskManager * diskInstance  = NULL;
-static shared_ptr<configureInfo> configure = NULL;
+//static shared_ptr <configureInfo> configure = NULL;
 //static MemoryManager * memoryInstance = NULL;
 //static IOManager * ioInstance = NULL;
+static shared_ptr <configureInfo> configurefile;
 /*用于处理客户的请求类*/
  class CacheConn
   {
@@ -77,14 +78,14 @@ static shared_ptr<configureInfo> configure = NULL;
     static int m_user_count;//统计用户数量
    private:
    	  static const int BUFFER_SIZE = 1024;  //缓存区的大小
-      static const int W_DATA = 1024;   //存储客户写数据的大小
+      static const unsigned int W_DATA = 1024;   //存储客户写数据的大小
 
       char m_write[W_DATA];  // 写文件块
    	  sockaddr_in m_address;
       int m_sockfd;
    	  char m_buf[BUFFER_SIZE];
    	  int m_read_idx; //标志读缓存区中已经读入客户数据的最后一个字节的下一个位置
-      int m_write_idx;
+      unsigned int m_write_idx;
    	  shared_ptr<ClientRequest> clientData;
       //ClientRequest *clientData;
    private:
@@ -106,7 +107,7 @@ class Entrance{
 public:
 	Entrance();
 	void parseParameters(int argc, char *const *argv); //解析这个程序运行的参数
-    bool initProgram(); // 初始化 程序的必要的东西
+  void initProgram(); // 初始化 程序的必要的东西
 
     
  private:
